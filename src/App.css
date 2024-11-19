@@ -1,53 +1,81 @@
+/* 전체 레이아웃 */
 .App {
+  font-family: 'Arial', sans-serif;
   text-align: center;
-  padding: 20px;
+  margin: 20px auto;
+  max-width: 900px;
 }
 
 h1 {
-  font-size: 24px;
+  color: #333;
+  font-size: 28px;
+  font-weight: bold;
   margin-bottom: 20px;
 }
 
-.timetable {
-  display: inline-block;
-  border-collapse: collapse;
-  width: 80%;
-  max-width: 700px;
+.file-upload,
+.semester-select {
+  margin-bottom: 15px;
 }
 
-.timetable-header, .timetable-body {
+select,
+button {
+  padding: 10px 15px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* 시간표 그리드 */
+.timetable {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background-color: #ddd;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+.day-column {
+  background: #f9f9f9;
   display: flex;
   flex-direction: column;
 }
 
-.row {
-  display: flex;
-}
-
-.cell {
-  border: 1px solid #ddd;
-  width: 80px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.header-cell {
+.day-column h2 {
+  background: #444;
+  color: white;
+  text-align: center;
+  font-size: 16px;
   font-weight: bold;
-  background-color: #f0f0f0;
+  padding: 10px 0;
+  margin: 0;
 }
 
-.time-cell {
-  font-weight: bold;
-  background-color: #fafafa;
-  width: 50px;
+.hour-cell {
+  height: 60px;
+  border-bottom: 1px solid #ddd;
+  position: relative;
 }
 
-.subject {
-  background-color: #a2d2ff;
-  color: #333;
-  font-size: 14px;
-  padding: 5px;
+.lecture-box {
+  position: relative;
+  background: #42a5f5;
+  color: white;
   border-radius: 5px;
+  padding: 5px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
