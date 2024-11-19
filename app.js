@@ -157,56 +157,41 @@ function App() {
     return results;
   };
 
-  const calculateWaitTime = (timetable) => {
-    const times = [];
-
-    timetable.forEach((lecture) =>
-      lecture.parsedTimes.forEach((time) =>
-        times.push({
-          day: time.day,
-          hour: parseInt(time.period, 10),
-        })
-      )
-    );
-
-    const waitTimeByDay = {};
-    times.forEach((time) => {
-      if (!waitTimeByDay[time.day]) {
-        waitTimeByDay[time.day] = [];
-      }
-      waitTimeByDay[time.day].push(time.hour);
-    });
-
-    let totalWaitTime = 0;
-    for (const day in waitTimeByDay) {
-      const hours = waitTimeByDay[day].sort((a, b) => a - b);
-      for (let i = 1; i < hours.length; i++) {
-        totalWaitTime += hours[i] - hours[i - 1];
-      }
-    }
-
-    return totalWaitTime;
-  };
-
   const selectGreedyTimetable = () => {
     if (!allTimetables || allTimetables.length === 0) {
       alert("시간표를 생성한 후 실행하세요.");
       return;
     }
 
-    let minWaitTime = Infinity;
+    let minDayImbalance = Infinity; // 요일 간 불균형의 최소값
     let bestTimetable = null;
 
     allTimetables.forEach((timetable) => {
-      const waitTime = calculateWaitTime(timetable);
-      if (waitTime < minWaitTime) {
-        minWaitTime = waitTime;
+      const dayCount = { 월: 0, 화: 0, 수: 0, 목: 0, 금: 0 }; // 요일별 강의 수 초기화
+
+      timetable.forEach((lecture) =>
+        lecture.parsedTimes.forEach((time) => {
+          if (dayCount[time.day] !== undefined) {
+            dayCount[time.day]++;
+          }
+        })
+      );
+
+      // 요일별 최대-최소 강의 수 차이를 불균형으로 정의
+      const dayCounts = Object.values(dayCount);
+      const imbalance = Math.max(...dayCounts) - Math.min(...dayCounts);
+
+      // 불균형이 최소인 시간표를 선택
+      if (imbalance < minDayImbalance) {
+        minDayImbalance = imbalance;
         bestTimetable = timetable;
       }
     });
 
     setSelectedTimetable(bestTimetable);
-    alert(`최적의 시간표가 선택되었습니다! 대기시간: ${minWaitTime}시간`);
+    alert(
+      `최적의 시간표가 선택되었습니다!`
+    );
   };
 
   const handleGenerateSchedule = () => {
@@ -255,7 +240,7 @@ function App() {
       </button>
 
       <button onClick={selectGreedyTimetable} disabled={!allTimetables.length}>
-        대기시간 최소 시간표 선택
+        월~금 고르게 분배 된 시간표 생성
       </button>
 
       {selectedTimetable && (
