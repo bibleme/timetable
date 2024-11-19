@@ -1,0 +1,132 @@
+/* 전체 레이아웃 */
+.App {
+  font-family: 'Arial', sans-serif;
+  text-align: center;
+  margin: 20px auto;
+  max-width: 900px;
+}
+
+h1 {
+  color: #333;
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+.file-upload,
+.lecture-select {
+  margin-bottom: 15px;
+}
+
+select,
+button {
+  padding: 10px 15px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* 시간표 그리드 */
+.timetable {
+  display: grid;
+  grid-template-columns: 100px repeat(5, 1fr); /* 첫 열은 시간 */
+  gap: 1px;
+  background-color: #ddd;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+/* 시간 열 */
+.time-column {
+  background: #333;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.time-column h2 {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 0;
+  padding: 10px 0;
+}
+
+.time-column .hour-cell {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border-bottom: 1px solid #444;
+}
+
+/* 요일 열 */
+.day-column {
+  background: #f9f9f9;
+  display: flex;
+  flex-direction: column;
+}
+
+.day-column h2 {
+  background: #444;
+  color: white;
+  text-align: center;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 10px 0;
+  margin: 0;
+}
+
+.hour-cell {
+  height: 60px;
+  border-bottom: 1px solid #ddd;
+  position: relative;
+}
+
+/* 강의 박스 */
+.lecture-box {
+  position: relative;
+  background: #42a5f5;
+  color: white;
+  border-radius: 5px;
+  padding: 5px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.lecture-box:hover {
+  background: #1e88e5;
+  transform: scale(1.02);
+  transition: all 0.2s ease-in-out;
+}
+
+.remove-button {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  background: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 5px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.remove-button:hover {
+  background: #361cb7;
+}
