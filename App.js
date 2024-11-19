@@ -2,10 +2,6 @@ import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import './App.css';
 
-const days = ["월", "화", "수", "목", "금"];
-const hours = Array.from({ length: 10 }, (_, i) => i + 9); // 9시부터 18시까지
-
-// 교시 번호와 실제 시간 매핑
 const periodToHour = {
   "1": "9",
   "2": "10",
@@ -16,18 +12,50 @@ const periodToHour = {
   "7": "15",
   "8": "16",
   "9": "17",
-  "10": "18"
+  "10": "18",
 };
 
 const semesters = ["1-1", "1-2", "2-1", "2-2", "3-1", "3-2", "4-1", "4-2"];
 
-function App() {
-  const [schedule, setSchedule] = useState([]);
-  const [lecturesFromFile, setLecturesFromFile] = useState([]); // 엑셀에서 불러온 전체 강의 목록
-  const [selectedLecture, setSelectedLecture] = useState(null); // 사용자가 선택한 강의
-  const [selectedSemester, setSelectedSemester] = useState(""); // 사용자가 선택한 학기
+const Modal = ({ isOpen, timetables, onClose }) => {
+  if (!isOpen) return null;
 
-  // 엑셀 파일 업로드 및 데이터 읽기 함수
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <button className="modal-close" onClick={onClose}>
+          닫기
+        </button>
+        <h2>생성된 시간표</h2>
+        {timetables.map((schedule, index) => (
+          <div key={index} className="timetable">
+            <h3>시간표 {index + 1}</h3>
+            {schedule.map((lecture, i) => (
+              <div key={i} className="lecture-box">
+                <strong>{lecture.name}</strong>
+                <p>{lecture.location}</p>
+                {lecture.parsedTimes.map((time, idx) => (
+                  <p key={idx}>
+                    {time.day}요일, {time.period}:00
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+function App() {
+  const [lecturesFromFile, setLecturesFromFile] = useState([]);
+  const [selectedSemester, setSelectedSemester] = useState("");
+  const [fileReadComplete, setFileReadComplete] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [allTimetables, setAllTimetables] = useState([]);
+  const [selectedCriteria, setSelectedCriteria] = useState("mostFreeDays");
+
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     const reader = new FileReader();
@@ -39,113 +67,228 @@ function App() {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      // 엑셀 데이터 포맷에 맞춰 변환하여 전체 강의 목록에 저장
       const formattedData = jsonData.map((row) => ({
-        name: row['교과목명'],
-        code: row['학수번호'],
-        professor: row['담당교수'],
-        semester: row['학기'], // 학기 열 추가
-        times: row['강의시간'] ? row['강의시간'].split(',') : [], // 여러 시간대 포함
+        name: row['name'],
+        location: row['location'],
+        semester: row['semester'],
+        times: row['times'] ? row['times'] : [],
       }));
 
-      setLecturesFromFile(formattedData); // 전체 강의 목록 업데이트
+      setLecturesFromFile(formattedData);
+      setFileReadComplete(true);
+      console.log("업로드된 강의 데이터:", formattedData);
     };
 
     reader.readAsArrayBuffer(file);
   };
 
-  // 선택한 학기에 맞는 강의 목록 필터링
-  const filteredLectures = lecturesFromFile.filter(
-    (lecture) => lecture.semester === selectedSemester
-  );
-
-  // 선택한 강의를 시간표에 추가하는 함수
-  const addSelectedLecture = () => {
-    if (selectedLecture) {
-      // 시간표에 추가할 강의 목록 생성
-      const lecturesToAdd = selectedLecture.times.map((time) => {
-        const [day, period] = time.trim().split(/(?=\d)/); // 요일과 교시 번호 분리
-        const hour = periodToHour[period]; // 교시 번호를 실제 시간으로 변환
-        return {
-          name: selectedLecture.name,
-          day,
-          time: hour
-        };
+  const parseTimes = (timesStr) => {
+    if (!timesStr) return [];
+    try {
+      const times = JSON.parse(timesStr.replace(/'/g, '"'));
+      return times.map((time) => {
+        const day = time[0];
+        const period = time.slice(1);
+        return { day, period };
       });
-
-      // 새로운 강의들을 한 번에 schedule에 추가
-      setSchedule((prevSchedule) => [...prevSchedule, ...lecturesToAdd]);
-      setSelectedLecture(null); // 선택 초기화
-    } else {
-      alert("강의를 선택해주세요.");
+    } catch {
+      return [];
     }
   };
 
+  const filterLectures = (lectures, semester) => {
+    const seen = new Set();
+    return lectures
+      .filter((lecture) => lecture.semester === semester)
+      .map((lecture) => ({
+        ...lecture,
+        parsedTimes: parseTimes(lecture.times),
+      }))
+      .filter((lecture) => {
+        const uniqueKey = `${lecture.name}-${lecture.times}`;
+        if (seen.has(uniqueKey)) {
+          return false;
+        }
+        seen.add(uniqueKey);
+        return true;
+      });
+  };
+
+  const hasConflict = (existingSchedule, newLecture) => {
+    return newLecture.parsedTimes.some((newTime) =>
+      existingSchedule.some((scheduled) =>
+        scheduled.parsedTimes.some(
+          (scheduledTime) =>
+            scheduledTime.day === newTime.day &&
+            scheduledTime.period === newTime.period
+        )
+      )
+    );
+  };
+
+  const generateValidTimetables = (lectures) => {
+    const results = [];
+  
+    const backtrack = (currentSchedule, includedNames, index) => {
+      if (index === lectures.length) {
+        if (
+          includedNames.size ===
+          new Set(lectures.map((lecture) => lecture.name)).size
+        ) {
+          results.push([...currentSchedule]);
+        }
+        return;
+      }
+  
+      const lecture = lectures[index];
+  
+      if (!includedNames.has(lecture.name) && !hasConflict(currentSchedule, lecture)) {
+        backtrack(
+          [...currentSchedule, lecture],
+          new Set([...includedNames, lecture.name]),
+          index + 1
+        );
+      }
+  
+      backtrack(currentSchedule, includedNames, index + 1);
+    };
+  
+    backtrack([], new Set(), 0);
+  
+    // 시간표와 인덱스를 함께 반환
+    return results.map((schedule, index) => ({ schedule, index }));
+  };
+  
+
+  const handleGenerateSchedule = () => {
+    const filteredLectures = filterLectures(lecturesFromFile, selectedSemester);
+    const validTimetables = generateValidTimetables(filteredLectures);
+  
+    if (validTimetables.length === 0) {
+      alert("조건을 만족하는 시간표를 생성할 수 없습니다.");
+      return;
+    }
+  
+    setAllTimetables(validTimetables); // 시간표와 인덱스가 포함된 결과 저장
+    setIsModalOpen(true); // 모든 시간표 표시
+  };
+  
+  const countFreeDays = (schedule) => {
+    const daysWithClasses = new Set();
+    schedule.forEach((lecture) => {
+      lecture.parsedTimes.forEach((time) => {
+        daysWithClasses.add(time.day);
+      });
+    });
+    return 5 - daysWithClasses.size; // 5일(월~금) 중 공강일 계산
+  };
+  
+  const findSchedulesWithMostFreeDays = (timetables) => {
+    const freeDaysCount = timetables.map(({ schedule }) => countFreeDays(schedule));
+    const maxFreeDays = Math.max(...freeDaysCount);
+  
+    return timetables.filter((_, index) => freeDaysCount[index] === maxFreeDays);
+  };
+  
+  const handleSelectTimetable = () => {
+    if (allTimetables.length === 0) {
+      alert("생성된 시간표가 없습니다.");
+      return;
+    }
+  
+    if (selectedCriteria === "mostFreeDays") {
+      const schedulesWithMostFreeDays = findSchedulesWithMostFreeDays(allTimetables);
+  
+      if (schedulesWithMostFreeDays.length > 0) {
+        alert(`${schedulesWithMostFreeDays.length}개의 시간표를 선택했습니다!`);
+        setAllTimetables(schedulesWithMostFreeDays); // 선택된 시간표만 저장
+        setIsModalOpen(true); // 선택된 시간표 모달로 표시
+      } else {
+        alert("조건을 만족하는 시간표가 없습니다.");
+      }
+    } else {
+      alert("선택한 기준은 아직 구현되지 않았습니다.");
+    }
+  };
+  
+
+  
+  const Modal = ({ isOpen, timetables, onClose }) => {
+    if (!isOpen) return null;
+  
+    return (
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <button className="modal-close" onClick={onClose}>
+            닫기
+          </button>
+          <h2>생성된 시간표</h2>
+          {timetables.map(({ schedule, index }) => (
+            <div key={index} className="timetable">
+              <h3>시간표 {index + 1}</h3> {/* 실제 시간표 번호 */}
+              {schedule.map((lecture, i) => (
+                <div key={i} className="lecture-box">
+                  <strong>{lecture.name}</strong>
+                  <p>{lecture.location}</p>
+                  {lecture.parsedTimes.map((time, idx) => (
+                    <p key={idx}>
+                      {time.day}요일, {time.period}:00
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  
+
   return (
     <div className="App">
-      <h1>시간표</h1>
+      <h1>시간표 생성기</h1>
 
-      {/* 학기 선택 */}
       <div className="semester-select">
-        <select onChange={(e) => setSelectedSemester(e.target.value)} value={selectedSemester}>
+        <select
+          onChange={(e) => setSelectedSemester(e.target.value)}
+          value={selectedSemester}
+        >
           <option value="">학기를 선택하세요</option>
           {semesters.map((semester) => (
-            <option key={semester} value={semester}>{semester}</option>
+            <option key={semester} value={semester}>
+              {semester}
+            </option>
           ))}
+        </select>
+        <div>선택된 학기: {selectedSemester}</div>
+      </div>
+
+      <div className="file-upload">
+        <input type="file" onChange={handleFileUpload} accept=".xlsx, .xls" />
+        {fileReadComplete && <div className="file-read-complete">파일 읽기가 완료되었습니다!</div>}
+      </div>
+
+      <button onClick={handleGenerateSchedule} disabled={!selectedSemester}>
+        시간표 생성
+      </button>
+
+      <div className="criteria-select">
+        <select
+          onChange={(e) => setSelectedCriteria(e.target.value)}
+          value={selectedCriteria}
+        >
+          <option value="mostFreeDays">많은 공강일</option>
+          <option value="specificProfessor">특정 교수</option>
+          <option value="leastFreeHours">적은 공강 시간</option>
         </select>
       </div>
 
-      {/* 엑셀 파일 업로드 */}
-      <div className="file-upload">
-        <input type="file" onChange={handleFileUpload} accept=".xlsx, .xls" />
-      </div>
+      <button onClick={handleSelectTimetable} disabled={allTimetables.length === 0}>
+        선택 기준에 따라 시간표 선택
+      </button>
 
-      {/* 선택한 학기의 강의 목록 드롭다운 */}
-      <div className="lecture-preview">
-        <h2>강의 목록</h2>
-        {filteredLectures.length > 0 ? (
-          <select onChange={(e) => setSelectedLecture(JSON.parse(e.target.value))}>
-            <option value="">강의를 선택하세요</option>
-            {filteredLectures.map((lecture, index) => (
-              <option key={index} value={JSON.stringify(lecture)}>
-                {lecture.name} - {lecture.code} - {lecture.professor} - {lecture.times.join(', ')}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <p>학기를 선택하고 엑셀 파일에서 강의를 불러오세요.</p>
-        )}
-        <button onClick={addSelectedLecture}>강의 추가</button>
-      </div>
-
-      {/* 시간표 테이블 */}
-      <div className="timetable">
-        <table>
-          <thead>
-            <tr>
-              <th>시간</th>
-              {days.map((day) => (
-                <th key={day}>{day}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {hours.map((hour) => (
-              <tr key={hour}>
-                <td className="time-column">{hour}:00</td>
-                {days.map((day) => {
-                  const lecture = schedule.find((lec) => lec.day === day && lec.time === String(hour));
-                  return (
-                    <td key={day} className="lecture-cell">
-                      {lecture ? <div className="lecture-box">{lecture.name}</div> : ''}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Modal isOpen={isModalOpen} timetables={allTimetables} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }
