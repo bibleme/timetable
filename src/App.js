@@ -2,19 +2,6 @@ import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import './App.css';
 
-const periodToHour = {
-  "1": "9",
-  "2": "10",
-  "3": "11",
-  "4": "12",
-  "5": "13",
-  "6": "14",
-  "7": "15",
-  "8": "16",
-  "9": "17",
-  "10": "18",
-};
-
 const semesters = ["1-1", "1-2", "2-1", "2-2", "3-1", "3-2", "4-1", "4-2"];
 
 const Modal = ({ isOpen, timetables, onClose }) => {
@@ -33,7 +20,8 @@ const Modal = ({ isOpen, timetables, onClose }) => {
             {schedule.map((lecture, i) => (
               <div key={i} className="lecture-box">
                 <strong>{lecture.name}</strong>
-                <p>{lecture.location}</p>
+                <p>장소: {lecture.location}</p>
+                <p>교수: {lecture.professor}</p>
                 {lecture.parsedTimes.map((time, idx) => (
                   <p key={idx}>
                     {time.day}요일, {time.period}:00
@@ -54,6 +42,7 @@ function App() {
   const [fileReadComplete, setFileReadComplete] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [allTimetables, setAllTimetables] = useState([]);
+  const [preferredProfessors, setPreferredProfessors] = useState(["", "", ""]);
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -69,13 +58,14 @@ function App() {
       const formattedData = jsonData.map((row) => ({
         name: row['name'],
         location: row['location'],
+        professor: row['professor'] || "",
         semester: row['semester'],
         times: row['times'] ? row['times'] : [],
       }));
 
       setLecturesFromFile(formattedData);
       setFileReadComplete(true);
-      console.log("업로드된 강의 데이터:", formattedData);
+      console.log("Uploaded Lectures:", formattedData);
     };
 
     reader.readAsArrayBuffer(file);
@@ -125,6 +115,32 @@ function App() {
     );
   };
 
+  const evaluateTimetable = (timetable, professors) => {
+    return timetable.reduce((count, lecture) => {
+      return professors.some(
+        (prof) => prof && lecture.professor.toLowerCase() === prof.toLowerCase()
+      )
+        ? count + 1
+        : count;
+    }, 0);
+  };
+
+  const findOptimalTimetables = (timetables, professors) => {
+    if (professors.every((prof) => !prof)) return timetables;
+    let maxCount = 0;
+    let optimal = [];
+    timetables.forEach((timetable) => {
+      const count = evaluateTimetable(timetable, professors);
+      if (count > maxCount) {
+        maxCount = count;
+        optimal = [timetable];
+      } else if (count === maxCount) {
+        optimal.push(timetable);
+      }
+    });
+    return optimal;
+  };
+
   const generateValidTimetables = (lectures) => {
     const results = [];
 
@@ -165,7 +181,12 @@ function App() {
       return;
     }
 
-    setAllTimetables(validTimetables);
+    const optimalTimetables = findOptimalTimetables(
+      validTimetables,
+      preferredProfessors
+    );
+
+    setAllTimetables(optimalTimetables);
     setIsModalOpen(true);
   };
 
@@ -188,6 +209,45 @@ function App() {
         <div>선택된 학기: {selectedSemester}</div>
       </div>
 
+      <div className="professor-input">
+        <input
+          type="text"
+          placeholder="선호 교수 1"
+          value={preferredProfessors[0]}
+          onChange={(e) =>
+            setPreferredProfessors([
+              e.target.value,
+              preferredProfessors[1],
+              preferredProfessors[2],
+            ])
+          }
+        />
+        <input
+          type="text"
+          placeholder="선호 교수 2 (선택 사항)"
+          value={preferredProfessors[1]}
+          onChange={(e) =>
+            setPreferredProfessors([
+              preferredProfessors[0],
+              e.target.value,
+              preferredProfessors[2],
+            ])
+          }
+        />
+        <input
+          type="text"
+          placeholder="선호 교수 3 (선택 사항)"
+          value={preferredProfessors[2]}
+          onChange={(e) =>
+            setPreferredProfessors([
+              preferredProfessors[0],
+              preferredProfessors[1],
+              e.target.value,
+            ])
+          }
+        />
+      </div>
+
       <div className="file-upload">
         <input type="file" onChange={handleFileUpload} accept=".xlsx, .xls" />
         {fileReadComplete && <div className="file-read-complete">파일 읽기가 완료되었습니다!</div>}
@@ -197,7 +257,11 @@ function App() {
         시간표 생성
       </button>
 
-      <Modal isOpen={isModalOpen} timetables={allTimetables} onClose={() => setIsModalOpen(false)} />
+      <Modal
+        isOpen={isModalOpen}
+        timetables={allTimetables}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   );
 }
