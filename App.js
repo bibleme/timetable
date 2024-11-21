@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import * as XLSX from 'xlsx';
-import './App.css';
+import React, { useState } from "react";
+import * as XLSX from "xlsx";
+import "./App.css";
 
 const periodToHour = {
   "1": "9",
@@ -34,11 +34,12 @@ const Modal = ({ isOpen, timetables, onClose }) => {
               <div key={i} className="lecture-box">
                 <strong>{lecture.name}</strong>
                 <p>{lecture.location}</p>
-                {lecture.parsedTimes.map((time, idx) => (
-                  <p key={idx}>
-                    {time.day}요일, {time.period}:00
-                  </p>
-                ))}
+                {lecture.parsedTimes &&
+                  lecture.parsedTimes.map((time, idx) => (
+                    <p key={idx}>
+                      {time.day}요일, {time.period}:00
+                    </p>
+                  ))}
               </div>
             ))}
           </div>
@@ -56,32 +57,7 @@ function App() {
   const [allTimetables, setAllTimetables] = useState([]);
   const [selectedCriteria, setSelectedCriteria] = useState("mostFreeDays");
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      const formattedData = jsonData.map((row) => ({
-        name: row['name'],
-        location: row['location'],
-        semester: row['semester'],
-        times: row['times'] ? row['times'] : [],
-      }));
-
-      setLecturesFromFile(formattedData);
-      setFileReadComplete(true);
-      console.log("업로드된 강의 데이터:", formattedData);
-    };
-
-    reader.readAsArrayBuffer(file);
-  };
-
+  // parseTimes 함수
   const parseTimes = (timesStr) => {
     if (!timesStr) return [];
     try {
@@ -96,6 +72,7 @@ function App() {
     }
   };
 
+  // filterLectures 함수
   const filterLectures = (lectures, semester) => {
     const seen = new Set();
     return lectures
@@ -114,6 +91,7 @@ function App() {
       });
   };
 
+  // hasConflict 함수
   const hasConflict = (existingSchedule, newLecture) => {
     return newLecture.parsedTimes.some((newTime) =>
       existingSchedule.some((scheduled) =>
@@ -126,9 +104,10 @@ function App() {
     );
   };
 
+  // generateValidTimetables 함수
   const generateValidTimetables = (lectures) => {
     const results = [];
-  
+
     const backtrack = (currentSchedule, includedNames, index) => {
       if (index === lectures.length) {
         if (
@@ -139,57 +118,71 @@ function App() {
         }
         return;
       }
-  
+
       const lecture = lectures[index];
-  
-      if (!includedNames.has(lecture.name) && !hasConflict(currentSchedule, lecture)) {
+
+      if (
+        !includedNames.has(lecture.name) &&
+        !hasConflict(currentSchedule, lecture)
+      ) {
         backtrack(
           [...currentSchedule, lecture],
           new Set([...includedNames, lecture.name]),
           index + 1
         );
       }
-  
+
       backtrack(currentSchedule, includedNames, index + 1);
     };
-  
-    backtrack([], new Set(), 0);
-  
-    // 시간표와 인덱스를 함께 반환
-    return results.map((schedule, index) => ({ schedule, index }));
-  };
-  
 
+    backtrack([], new Set(), 0);
+    return results;
+  };
+
+  // handleFileUpload 함수
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      const formattedData = jsonData.map((row) => ({
+        name: row["name"],
+        location: row["location"],
+        semester: row["semester"],
+        times: row["times"] ? row["times"] : [],
+      }));
+
+      setLecturesFromFile(formattedData);
+      setFileReadComplete(true);
+      console.log("업로드된 강의 데이터:", formattedData);
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  // handleGenerateSchedule 함수
   const handleGenerateSchedule = () => {
     const filteredLectures = filterLectures(lecturesFromFile, selectedSemester);
     const validTimetables = generateValidTimetables(filteredLectures);
-  
-    if (validTimetables.length === 0) {
+
+    if (!Array.isArray(validTimetables) || validTimetables.length === 0) {
       alert("조건을 만족하는 시간표를 생성할 수 없습니다.");
       return;
     }
-  
-    setAllTimetables(validTimetables); // 시간표와 인덱스가 포함된 결과 저장
-    setIsModalOpen(true); // 모든 시간표 표시
+
+    setAllTimetables(validTimetables);
+    setIsModalOpen(true);
+
+    console.log("생성된 모든 시간표:", validTimetables);
   };
-  
-  const countFreeDays = (schedule) => {
-    const daysWithClasses = new Set();
-    schedule.forEach((lecture) => {
-      lecture.parsedTimes.forEach((time) => {
-        daysWithClasses.add(time.day);
-      });
-    });
-    return 5 - daysWithClasses.size; // 5일(월~금) 중 공강일 계산
-  };
-  
-  const findSchedulesWithMostFreeDays = (timetables) => {
-    const freeDaysCount = timetables.map(({ schedule }) => countFreeDays(schedule));
-    const maxFreeDays = Math.max(...freeDaysCount);
-  
-    return timetables.filter((_, index) => freeDaysCount[index] === maxFreeDays);
-  };
-  
+
+  // handleSelectTimetable 함수
   const handleSelectTimetable = () => {
     if (allTimetables.length === 0) {
       alert("생성된 시간표가 없습니다.");
@@ -197,51 +190,31 @@ function App() {
     }
   
     if (selectedCriteria === "mostFreeDays") {
-      const schedulesWithMostFreeDays = findSchedulesWithMostFreeDays(allTimetables);
+      // 공강일이 가장 많은 단 하나의 시간표 선택
+      const calculateEmptyDays = (schedule) => {
+        const daysWithLectures = new Set();
+        schedule.forEach((lecture) => {
+          lecture.parsedTimes.forEach((time) => {
+            daysWithLectures.add(time.day);
+          });
+        });
+        const totalDays = 5; // 월~금
+        return totalDays - daysWithLectures.size;
+      };
   
-      if (schedulesWithMostFreeDays.length > 0) {
-        alert(`${schedulesWithMostFreeDays.length}개의 시간표를 선택했습니다!`);
-        setAllTimetables(schedulesWithMostFreeDays); // 선택된 시간표만 저장
-        setIsModalOpen(true); // 선택된 시간표 모달로 표시
-      } else {
-        alert("조건을 만족하는 시간표가 없습니다.");
-      }
+      // 가장 공강일이 많은 시간표 선택
+      const bestTimetable = allTimetables.reduce((best, current) => {
+        const bestEmptyDays = calculateEmptyDays(best);
+        const currentEmptyDays = calculateEmptyDays(current);
+        return currentEmptyDays > bestEmptyDays ? current : best;
+      });
+  
+      setAllTimetables([bestTimetable]); // 단일 시간표로 업데이트
+      setIsModalOpen(true); // 모달 열기
+      console.log("선택된 최적 시간표:", bestTimetable);
     } else {
-      alert("선택한 기준은 아직 구현되지 않았습니다.");
+      alert("현재 선택된 기준은 아직 구현되지 않았습니다.");
     }
-  };
-  
-
-  
-  const Modal = ({ isOpen, timetables, onClose }) => {
-    if (!isOpen) return null;
-  
-    return (
-      <div className="modal-overlay">
-        <div className="modal-content">
-          <button className="modal-close" onClick={onClose}>
-            닫기
-          </button>
-          <h2>생성된 시간표</h2>
-          {timetables.map(({ schedule, index }) => (
-            <div key={index} className="timetable">
-              <h3>시간표 {index + 1}</h3> {/* 실제 시간표 번호 */}
-              {schedule.map((lecture, i) => (
-                <div key={i} className="lecture-box">
-                  <strong>{lecture.name}</strong>
-                  <p>{lecture.location}</p>
-                  {lecture.parsedTimes.map((time, idx) => (
-                    <p key={idx}>
-                      {time.day}요일, {time.period}:00
-                    </p>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
   };
   
 
