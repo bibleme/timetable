@@ -65,7 +65,6 @@ function App() {
 
       setLecturesFromFile(formattedData);
       setFileReadComplete(true);
-      console.log("Uploaded Lectures:", formattedData);
     };
 
     reader.readAsArrayBuffer(file);
@@ -115,32 +114,6 @@ function App() {
     );
   };
 
-  const evaluateTimetable = (timetable, professors) => {
-    return timetable.reduce((count, lecture) => {
-      return professors.some(
-        (prof) => prof && lecture.professor.toLowerCase() === prof.toLowerCase()
-      )
-        ? count + 1
-        : count;
-    }, 0);
-  };
-
-  const findOptimalTimetables = (timetables, professors) => {
-    if (professors.every((prof) => !prof)) return timetables;
-    let maxCount = 0;
-    let optimal = [];
-    timetables.forEach((timetable) => {
-      const count = evaluateTimetable(timetable, professors);
-      if (count > maxCount) {
-        maxCount = count;
-        optimal = [timetable];
-      } else if (count === maxCount) {
-        optimal.push(timetable);
-      }
-    });
-    return optimal;
-  };
-
   const generateValidTimetables = (lectures) => {
     const results = [];
 
@@ -172,8 +145,37 @@ function App() {
     return results;
   };
 
+  const generateGreedyTimetableFromValid = (validTimetables, professors) => {
+    if (professors.every((prof) => !prof)) return validTimetables;
+
+    const scoredTimetables = validTimetables.map((timetable) => ({
+      timetable,
+      score: timetable.reduce(
+        (count, lecture) =>
+          professors.some(
+            (prof) =>
+              prof &&
+              lecture.professor.toLowerCase() === prof.toLowerCase()
+          )
+            ? count + 1
+            : count,
+        0
+      ),
+    }));
+
+    scoredTimetables.sort((a, b) => b.score - a.score);
+
+    return scoredTimetables.length > 0 ? [scoredTimetables[0].timetable] : [];
+  };
+
   const handleGenerateSchedule = () => {
     const filteredLectures = filterLectures(lecturesFromFile, selectedSemester);
+
+    if (filteredLectures.length === 0) {
+      alert("해당 학기에 강의가 없습니다.");
+      return;
+    }
+
     const validTimetables = generateValidTimetables(filteredLectures);
 
     if (validTimetables.length === 0) {
@@ -181,12 +183,12 @@ function App() {
       return;
     }
 
-    const optimalTimetables = findOptimalTimetables(
+    const optimalTimetable = generateGreedyTimetableFromValid(
       validTimetables,
       preferredProfessors
     );
 
-    setAllTimetables(optimalTimetables);
+    setAllTimetables(optimalTimetable);
     setIsModalOpen(true);
   };
 
