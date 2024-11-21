@@ -42,7 +42,7 @@ function App() {
   const [fileReadComplete, setFileReadComplete] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [allTimetables, setAllTimetables] = useState([]);
-  const [preferredProfessors, setPreferredProfessors] = useState(["", "", ""]);
+  const [preferredProfessor, setPreferredProfessor] = useState("");
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -145,18 +145,14 @@ function App() {
     return results;
   };
 
-  const generateGreedyTimetableFromValid = (validTimetables, professors) => {
-    if (professors.every((prof) => !prof)) return validTimetables;
+  const generateGreedyTimetableFromValid = (validTimetables, professor) => {
+    if (!professor) return validTimetables;
 
     const scoredTimetables = validTimetables.map((timetable) => ({
       timetable,
       score: timetable.reduce(
         (count, lecture) =>
-          professors.some(
-            (prof) =>
-              prof &&
-              lecture.professor.toLowerCase() === prof.toLowerCase()
-          )
+          lecture.professor.toLowerCase() === professor.toLowerCase()
             ? count + 1
             : count,
         0
@@ -185,7 +181,7 @@ function App() {
 
     const optimalTimetable = generateGreedyTimetableFromValid(
       validTimetables,
-      preferredProfessors
+      preferredProfessor
     );
 
     setAllTimetables(optimalTimetable);
@@ -214,39 +210,9 @@ function App() {
       <div className="professor-input">
         <input
           type="text"
-          placeholder="선호 교수 1"
-          value={preferredProfessors[0]}
-          onChange={(e) =>
-            setPreferredProfessors([
-              e.target.value,
-              preferredProfessors[1],
-              preferredProfessors[2],
-            ])
-          }
-        />
-        <input
-          type="text"
-          placeholder="선호 교수 2 (선택 사항)"
-          value={preferredProfessors[1]}
-          onChange={(e) =>
-            setPreferredProfessors([
-              preferredProfessors[0],
-              e.target.value,
-              preferredProfessors[2],
-            ])
-          }
-        />
-        <input
-          type="text"
-          placeholder="선호 교수 3 (선택 사항)"
-          value={preferredProfessors[2]}
-          onChange={(e) =>
-            setPreferredProfessors([
-              preferredProfessors[0],
-              preferredProfessors[1],
-              e.target.value,
-            ])
-          }
+          placeholder="선호 교수"
+          value={preferredProfessor}
+          onChange={(e) => setPreferredProfessor(e.target.value)}
         />
       </div>
 
