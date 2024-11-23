@@ -1,10 +1,23 @@
-import React, { useState } from 'react';
-import * as XLSX from 'xlsx';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
+import "./App.css";
+
+const periodToHour = {
+  "1": "09",
+  "2": "10",
+  "3": "11",
+  "4": "12",
+  "5": "13",
+  "6": "14",
+  "7": "15",
+  "8": "16",
+  "9": "17",
+  "10": "18",
+};
 
 const semesters = ["1-1", "1-2", "2-1", "2-2", "3-1", "3-2", "4-1", "4-2"];
 
-const Modal = ({ isOpen, timetables, onClose }) => {
+const Modal = ({ isOpen, timetables, onClose, onSelectTimetable }) => {
   if (!isOpen) return null;
 
   return (
@@ -16,19 +29,26 @@ const Modal = ({ isOpen, timetables, onClose }) => {
         <h2>생성된 시간표</h2>
         {timetables.map((schedule, index) => (
           <div key={index} className="timetable">
-            <h3>시간표 {index + 1}</h3>
+            <h3>
+              {timetables.length === 1 && index === 0
+                ? "최적 시간표"
+                : `시간표 ${index + 1}`}
+            </h3>
             {schedule.map((lecture, i) => (
               <div key={i} className="lecture-box">
                 <strong>{lecture.name}</strong>
-                <p>장소: {lecture.location}</p>
-                <p>교수: {lecture.professor}</p>
-                {lecture.parsedTimes.map((time, idx) => (
-                  <p key={idx}>
-                    {time.day}요일, {time.period}:00
-                  </p>
-                ))}
+                <p>교수: {lecture.professor || "정보 없음"}</p>
+                {lecture.parsedTimes &&
+                  lecture.parsedTimes.map((time, idx) => (
+                    <p key={idx}>
+                      {time.day}요일, {time.period}:00
+                    </p>
+                  ))}
               </div>
             ))}
+            <button onClick={() => onSelectTimetable(schedule)}>
+              이 시간표 선택
+            </button>
           </div>
         ))}
       </div>
@@ -37,38 +57,26 @@ const Modal = ({ isOpen, timetables, onClose }) => {
 };
 
 function App() {
-  const [lecturesFromFile, setLecturesFromFile] = useState([]);
+  const [lectures, setLectures] = useState([]);
   const [selectedSemester, setSelectedSemester] = useState("");
-  const [fileReadComplete, setFileReadComplete] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [allTimetables, setAllTimetables] = useState([]);
-  const [preferredProfessor, setPreferredProfessor] = useState("");
+  const [selectedTimetable, setSelectedTimetable] = useState(null);
+  const [selectedCriteria, setSelectedCriteria] = useState("mostFreeDays");
+  const [optimalTimetable, setOptimalTimetable] = useState(null); // 최적 시간표 상태 추가
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      const formattedData = jsonData.map((row) => ({
-        name: row['name'],
-        location: row['location'],
-        professor: row['professor'] || "",
-        semester: row['semester'],
-        times: row['times'] ? row['times'] : [],
-      }));
-
-      setLecturesFromFile(formattedData);
-      setFileReadComplete(true);
-    };
-
-    reader.readAsArrayBuffer(file);
-  };
+  useEffect(() => {
+    fetch("/data/cleaned_sample.xlsx")
+      .then((response) => response.arrayBuffer())
+      .then((data) => {
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        setLectures(jsonData);
+      })
+      .catch((error) => console.error("Error fetching Excel file:", error));
+  }, []);
 
   const parseTimes = (timesStr) => {
     if (!timesStr) return [];
@@ -76,7 +84,7 @@ function App() {
       const times = JSON.parse(timesStr.replace(/'/g, '"'));
       return times.map((time) => {
         const day = time[0];
-        const period = time.slice(1);
+        const period = periodToHour[time.slice(1)];
         return { day, period };
       });
     } catch {
@@ -130,7 +138,10 @@ function App() {
 
       const lecture = lectures[index];
 
-      if (!includedNames.has(lecture.name) && !hasConflict(currentSchedule, lecture)) {
+      if (
+        !includedNames.has(lecture.name) &&
+        !hasConflict(currentSchedule, lecture)
+      ) {
         backtrack(
           [...currentSchedule, lecture],
           new Set([...includedNames, lecture.name]),
@@ -145,52 +156,109 @@ function App() {
     return results;
   };
 
-  const generateGreedyTimetableFromValid = (validTimetables, professor) => {
-    if (!professor) return validTimetables;
-
-    const scoredTimetables = validTimetables.map((timetable) => ({
-      timetable,
-      score: timetable.reduce(
-        (count, lecture) =>
-          lecture.professor.toLowerCase() === professor.toLowerCase()
-            ? count + 1
-            : count,
-        0
-      ),
-    }));
-
-    scoredTimetables.sort((a, b) => b.score - a.score);
-
-    return scoredTimetables.length > 0 ? [scoredTimetables[0].timetable] : [];
-  };
-
   const handleGenerateSchedule = () => {
-    const filteredLectures = filterLectures(lecturesFromFile, selectedSemester);
-
-    if (filteredLectures.length === 0) {
-      alert("해당 학기에 강의가 없습니다.");
-      return;
-    }
-
+    const filteredLectures = filterLectures(lectures, selectedSemester);
     const validTimetables = generateValidTimetables(filteredLectures);
 
-    if (validTimetables.length === 0) {
+    if (!validTimetables.length) {
       alert("조건을 만족하는 시간표를 생성할 수 없습니다.");
       return;
     }
 
-    const optimalTimetable = generateGreedyTimetableFromValid(
-      validTimetables,
-      preferredProfessor
-    );
-
-    setAllTimetables(optimalTimetable);
+    setAllTimetables(validTimetables);
+    setOptimalTimetable(null); // 최적 시간표 초기화
     setIsModalOpen(true);
+  };
+
+  const viewOptimalTimetable = () => {
+    if (!allTimetables.length) {
+      alert("생성된 시간표가 없습니다.");
+      return;
+    }
+
+    let optimal;
+
+    switch (selectedCriteria) {
+      case "mostFreeDays":
+        optimal = allTimetables.reduce((best, current) => {
+          const calculateFreeDays = (schedule) => {
+            const days = new Set();
+            schedule.forEach((lecture) =>
+              lecture.parsedTimes.forEach((time) => days.add(time.day))
+            );
+            return 5 - days.size;
+          };
+
+          return calculateFreeDays(current) > calculateFreeDays(best)
+            ? current
+            : best;
+        });
+        break;
+
+      case "specificProfessor":
+        const preferredProfessor = prompt("선호하는 교수님의 성함을 입력하세요:");
+        if (!preferredProfessor) {
+          alert("교수님의 성함을 입력해주세요.");
+          return;
+        }
+
+        const filteredTimetables = allTimetables.filter((timetable) =>
+          timetable.some(
+            (lecture) =>
+              lecture.professor &&
+              lecture.professor
+                .toLowerCase()
+                .includes(preferredProfessor.toLowerCase().trim())
+          )
+        );
+
+        if (!filteredTimetables.length) {
+          alert(
+            `${preferredProfessor} 교수님이 포함된 시간표를 찾을 수 없습니다.`
+          );
+          return;
+        }
+
+        optimal = filteredTimetables[0];
+        break;
+
+      case "balancedDistribution":
+        optimal = allTimetables.reduce((best, current) => {
+          const calculateDistribution = (schedule) => {
+            const hoursPerDay = {};
+            schedule.forEach((lecture) =>
+              lecture.parsedTimes.forEach((time) => {
+                hoursPerDay[time.day] = (hoursPerDay[time.day] || 0) + 1;
+              })
+            );
+            const values = Object.values(hoursPerDay);
+            return Math.max(...values) - Math.min(...values);
+          };
+
+          return calculateDistribution(current) < calculateDistribution(best)
+            ? current
+            : best;
+        });
+        break;
+
+      default:
+        alert("유효한 기준을 선택하세요.");
+        return;
+    }
+
+    setOptimalTimetable(optimal);
+    setIsModalOpen(true);
+  };
+
+  const handleSelectTimetableFromModal = (schedule) => {
+    setSelectedTimetable(schedule);
+    setIsModalOpen(false);
+    alert("시간표가 선택되었습니다.");
   };
 
   return (
     <div className="App">
-      <h1>시간표 생성기</h1>
+      <h1>SchedulEase</h1>
 
       <div className="semester-select">
         <select
@@ -204,32 +272,55 @@ function App() {
             </option>
           ))}
         </select>
-        <div>선택된 학기: {selectedSemester}</div>
-      </div>
-
-      <div className="professor-input">
-        <input
-          type="text"
-          placeholder="선호 교수"
-          value={preferredProfessor}
-          onChange={(e) => setPreferredProfessor(e.target.value)}
-        />
-      </div>
-
-      <div className="file-upload">
-        <input type="file" onChange={handleFileUpload} accept=".xlsx, .xls" />
-        {fileReadComplete && <div className="file-read-complete">파일 읽기가 완료되었습니다!</div>}
       </div>
 
       <button onClick={handleGenerateSchedule} disabled={!selectedSemester}>
         시간표 생성
       </button>
 
+      <div className="criteria-select">
+        <select
+          onChange={(e) => setSelectedCriteria(e.target.value)}
+          value={selectedCriteria}
+        >
+          <option value="mostFreeDays">많은 공강</option>
+          <option value="specificProfessor">특정 교수</option>
+          <option value="balancedDistribution">고른 배분</option>
+        </select>
+      </div>
+
+      <button onClick={viewOptimalTimetable} disabled={!allTimetables.length}>
+        최적 시간표 보기
+      </button>
+
       <Modal
         isOpen={isModalOpen}
-        timetables={allTimetables}
+        timetables={optimalTimetable ? [optimalTimetable] : allTimetables}
         onClose={() => setIsModalOpen(false)}
+        onSelectTimetable={handleSelectTimetableFromModal}
       />
+
+      <div className="selected-timetable">
+        <h2>선택된 시간표</h2>
+        {selectedTimetable ? (
+          <div className="timetable">
+            {selectedTimetable.map((lecture, i) => (
+              <div key={i} className="lecture-box">
+                <strong>{lecture.name}</strong>
+                <p>교수: {lecture.professor || "정보 없음"}</p>
+                {lecture.parsedTimes &&
+                  lecture.parsedTimes.map((time, idx) => (
+                    <p key={idx}>
+                      {time.day}요일, {time.period}:00
+                    </p>
+                  ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>선택된 시간표가 없습니다. 시간표 생성 후 선택해주세요.</p>
+        )}
+      </div>
     </div>
   );
 }
