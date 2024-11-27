@@ -1,275 +1,215 @@
-import React, { useState } from 'react';
-import * as XLSX from 'xlsx';
-import './App.css';
-
-const periodToHour = {
-  "1": "9",
-  "2": "10",
-  "3": "11",
-  "4": "12",
-  "5": "13",
-  "6": "14",
-  "7": "15",
-  "8": "16",
-  "9": "17",
-  "10": "18",
-};
-
-const semesters = ["1-1", "1-2", "2-1", "2-2", "3-1", "3-2", "4-1", "4-2"];
-
-const Modal = ({ isOpen, timetables, onClose, onSelectTimetable }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <button className="modal-close" onClick={onClose}>
-          닫기
-        </button>
-        <h2>생성된 시간표</h2>
-        {timetables.map((schedule, index) => (
-          <div key={index} className="timetable">
-            <h3>시간표 {index + 1}</h3>
-            {schedule.map((lecture, i) => (
-              <div key={i} className="lecture-box">
-                <strong>{lecture.name}</strong>
-                <p>{lecture.location}</p>
-                {lecture.parsedTimes.map((time, idx) => (
-                  <p key={idx}>
-                    {time.day}요일, {time.period}:00
-                  </p>
-                ))}
-              </div>
-            ))}
-            <button onClick={() => onSelectTimetable(index)}>이 시간표 선택</button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-function App() {
-  const [lecturesFromFile, setLecturesFromFile] = useState([]);
-  const [selectedSemester, setSelectedSemester] = useState("");
-  const [fileReadComplete, setFileReadComplete] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [allTimetables, setAllTimetables] = useState([]);
-  const [selectedTimetable, setSelectedTimetable] = useState(null);
-
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      const formattedData = jsonData.map((row) => ({
-        name: row['name'],
-        location: row['location'],
-        semester: row['semester'],
-        times: row['times'] ? row['times'] : [],
-      }));
-
-      setLecturesFromFile(formattedData);
-      setFileReadComplete(true);
-    };
-
-    reader.readAsArrayBuffer(file);
-  };
-
-  const parseTimes = (timesStr) => {
-    if (!timesStr) return [];
-    try {
-      const times = JSON.parse(timesStr.replace(/'/g, '"'));
-      return times.map((time) => {
-        const day = time[0];
-        const period = periodToHour[time.slice(1)];
-        return { day, period };
-      });
-    } catch {
-      return [];
-    }
-  };
-
-  const filterLectures = (lectures, semester) => {
-    const seen = new Set();
-    return lectures
-      .filter((lecture) => lecture.semester === semester)
-      .map((lecture) => ({
-        ...lecture,
-        parsedTimes: parseTimes(lecture.times),
-      }))
-      .filter((lecture) => {
-        const uniqueKey = `${lecture.name}-${lecture.times}`;
-        if (seen.has(uniqueKey)) {
-          return false;
-        }
-        seen.add(uniqueKey);
-        return true;
-      });
-  };
-
-  const hasConflict = (existingSchedule, newLecture) => {
-    return newLecture.parsedTimes.some((newTime) =>
-      existingSchedule.some((scheduled) =>
-        scheduled.parsedTimes.some(
-          (scheduledTime) =>
-            scheduledTime.day === newTime.day &&
-            scheduledTime.period === newTime.period
-        )
-      )
-    );
-  };
-
-  const generateValidTimetables = (lectures) => {
-    const results = [];
-
-    const backtrack = (currentSchedule, includedNames, index) => {
-      if (index === lectures.length) {
-        if (
-          includedNames.size ===
-          new Set(lectures.map((lecture) => lecture.name)).size
-        ) {
-          results.push([...currentSchedule]);
-        }
-        return;
-      }
-
-      const lecture = lectures[index];
-
-      if (!includedNames.has(lecture.name) && !hasConflict(currentSchedule, lecture)) {
-        backtrack(
-          [...currentSchedule, lecture],
-          new Set([...includedNames, lecture.name]),
-          index + 1
-        );
-      }
-
-      backtrack(currentSchedule, includedNames, index + 1);
-    };
-
-    backtrack([], new Set(), 0);
-    return results;
-  };
-
-  const selectGreedyTimetable = () => {
-    if (!allTimetables || allTimetables.length === 0) {
-      alert("시간표를 생성한 후 실행하세요.");
-      return;
-    }
-
-    let minDayImbalance = Infinity; // 요일 간 불균형의 최소값
-    let bestTimetable = null;
-
-    allTimetables.forEach((timetable) => {
-      const dayCount = { 월: 0, 화: 0, 수: 0, 목: 0, 금: 0 }; // 요일별 강의 수 초기화
-
-      timetable.forEach((lecture) =>
-        lecture.parsedTimes.forEach((time) => {
-          if (dayCount[time.day] !== undefined) {
-            dayCount[time.day]++;
-          }
-        })
-      );
-
-      // 요일별 최대-최소 강의 수 차이를 불균형으로 정의
-      const dayCounts = Object.values(dayCount);
-      const imbalance = Math.max(...dayCounts) - Math.min(...dayCounts);
-
-      // 불균형이 최소인 시간표를 선택
-      if (imbalance < minDayImbalance) {
-        minDayImbalance = imbalance;
-        bestTimetable = timetable;
-      }
-    });
-
-    setSelectedTimetable(bestTimetable);
-    alert(
-      `최적의 시간표가 선택되었습니다!`
-    );
-  };
-
-  const handleGenerateSchedule = () => {
-    const filteredLectures = filterLectures(lecturesFromFile, selectedSemester);
-    const validTimetables = generateValidTimetables(filteredLectures);
-
-    if (validTimetables.length === 0) {
-      alert("조건을 만족하는 시간표를 생성할 수 없습니다.");
-      return;
-    }
-
-    setAllTimetables(validTimetables);
-    setIsModalOpen(true);
-  };
-
-  const handleSelectTimetable = (index) => {
-    setSelectedTimetable(allTimetables[index]);
-    setIsModalOpen(false);
-  };
-
-  return (
-    <div className="App">
-      <h1>시간표 생성기</h1>
-
-      <div className="semester-select">
-        <select
-          onChange={(e) => setSelectedSemester(e.target.value)}
-          value={selectedSemester}
-        >
-          <option value="">학기를 선택하세요</option>
-          {semesters.map((semester) => (
-            <option key={semester} value={semester}>
-              {semester}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="file-upload">
-        <input type="file" onChange={handleFileUpload} accept=".xlsx, .xls" />
-        {fileReadComplete && <div className="file-read-complete">파일 읽기가 완료되었습니다!</div>}
-      </div>
-
-      <button onClick={handleGenerateSchedule} disabled={!selectedSemester}>
-        시간표 생성
-      </button>
-
-      <button onClick={selectGreedyTimetable} disabled={!allTimetables.length}>
-        월~금 고르게 분배 된 시간표 생성
-      </button>
-
-      {selectedTimetable && (
-        <div className="selected-timetable">
-          <h2>선택된 시간표</h2>
-          <div className="lecture-grid">
-            {selectedTimetable.map((lecture, i) => (
-              <div key={i} className="lecture-box">
-                <strong>{lecture.name}</strong>
-                <p>{lecture.location}</p>
-                {lecture.parsedTimes.map((time, idx) => (
-                  <p key={idx}>
-                    {time.day}요일, {time.period}:00
-                  </p>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <Modal
-        isOpen={isModalOpen}
-        timetables={allTimetables}
-        onClose={() => setIsModalOpen(false)}
-        onSelectTimetable={handleSelectTimetable}
-      />
-    </div>
-  );
+/* 기본 스타일 */
+body {
+  font-family: 'Roboto', Arial, sans-serif; /* 세련된 글꼴 */
+  background-color: #f5f7fa; /* 부드러운 배경색 */
+  margin: 0;
+  padding: 0;
+  color: #333;
+  line-height: 1.6;
 }
 
-export default App;
+h1 {
+  text-align: center;
+  color: #374151;
+  margin-top: 20px;
+  font-size: 2.5em;
+  font-weight: 700;
+}
+
+/* App 컨테이너 */
+.App {
+  max-width: 900px;
+  margin: 30px auto;
+  padding: 25px;
+  background-color: #ffffff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); /* 부드러운 그림자 */
+  border-radius: 12px;
+}
+
+/* 학기 선택 */
+.semester-select,
+.criteria-select {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.semester-select select,
+.criteria-select select {
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: border-color 0.3s ease;
+}
+
+.semester-select select:focus,
+.criteria-select select:focus {
+  outline: none;
+  border-color: #2563eb; /* 선택 시 파란색 테두리 */
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+/* 버튼 스타일 */
+button {
+  padding: 12px 24px;
+  font-size: 16px;
+  color: #ffffff;
+  background-color: #2563eb;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin: 10px 0;
+}
+
+button:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+  background-color: #1e3a8a; /* 더 진한 파란색 */
+  transform: translateY(-2px); /* 살짝 위로 올라감 */
+}
+
+/* 모달 스타일 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000; /* 다른 요소 위에 표시 */
+}
+
+.modal-content {
+  background-color: #ffffff;
+  padding: 25px;
+  border-radius: 12px;
+  max-width: 600px; /* 모달 창의 최대 너비 */
+  width: 90%;
+  max-height: 80%; /* 모달 창의 최대 높이 */
+  overflow-y: auto; /* 내용이 넘칠 경우 스크롤 */
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2); /* 더 강한 그림자 */
+  position: relative;
+  animation: fadeIn 0.3s ease;
+}
+
+/* 모달 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 닫기 버튼 스타일 */
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 20px;
+  color: #374151;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.modal-close:hover {
+  color: #ef4444; /* 빨간색 강조 */
+}
+
+/* 시간표 테이블 */
+.selected-timetable {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #e0f2fe; /* 부드러운 파란 배경 */
+  border: 1px solid #d1d5db;
+  border-radius: 28px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.selected-timetable h2 {
+  margin-bottom: 15px;
+  color: #1e3a8a; /* 진한 파란색 */
+  font-weight: 700;
+  font-size: 20px;
+}
+
+
+
+.timetable-grid table {
+  width: 100%; /* 테이블 전체 너비 */
+  table-layout: fixed; /* 모든 열의 너비를 동일하게 설정 */
+  border-collapse: collapse; /* 테두리 중복 제거 */
+}
+
+.timetable-grid th,
+.timetable-grid td {
+  border: 1px solid #d1d5db;
+  text-align: center;
+  padding: 15px;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.timetable-grid th {
+  background-color: #2563eb;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.timetable-grid td {
+  background-color: #ffffff;
+  vertical-align: top; /* 셀 안의 내용을 위쪽으로 정렬 */
+  text-align: center; /* 텍스트를 가운데 정렬 */
+  padding: 8px; /* 내부 여백 */
+  white-space: normal; /* 텍스트 줄바꿈 허용 */
+  height: auto; /* 높이를 내용에 맞게 조정 */
+
+}
+
+.lecture-box {
+  background-color: #e0f2fe;
+  margin: 5px auto;
+  padding: 9px;
+  border-radius: 6px;
+  color: #070707;
+  font-size: 14px;
+  text-align: center;
+  white-space: nowrap; /* 줄바꿈 방지 */
+  overflow: hidden; /* 넘치는 텍스트 숨김 */
+  text-overflow: ellipsis; /* 말줄임표 */
+  display: block;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 박스 그림자 */
+}
+
+  
+
+.lecture-box strong {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 4px; /* 강의 제목과 교수명 사이 여백 추가 */
+  white-space: nowrap; /* 제목 줄바꿈 방지 */
+  overflow: hidden; /* 내용 넘침 방지 */
+  text-overflow: ellipsis; /* 말줄임표 추가 */
+}
+
+.lecture-box p {
+  margin: 0;
+  font-size: 12px;
+  color: #4b5563; /* 교수명 회색 텍스트 */
+  white-space: nowrap; /* 줄바꿈 방지 */
+  overflow: hidden; /* 넘치는 텍스트 숨김 */
+  text-overflow: ellipsis; /* 말줄임표 처리 */
+}
