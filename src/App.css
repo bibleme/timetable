@@ -1,6 +1,6 @@
 /* 기본 스타일 */
 body {
-  font-family: 'Roboto', Arial, sans-serif; /* 더 세련된 글꼴 */
+  font-family: 'Roboto', Arial, sans-serif; /* 세련된 글꼴 */
   background-color: #f5f7fa; /* 부드러운 배경색 */
   margin: 0;
   padding: 0;
@@ -22,7 +22,7 @@ h1 {
   margin: 30px auto;
   padding: 25px;
   background-color: #ffffff;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); /* 더 부드러운 그림자 */
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); /* 부드러운 그림자 */
   border-radius: 12px;
 }
 
@@ -129,58 +129,87 @@ button:hover:not(:disabled) {
   color: #ef4444; /* 빨간색 강조 */
 }
 
-/* 시간표 리스트 */
-.timetable {
-  margin-bottom: 20px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 15px;
-  background-color: #f9fafb;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); /* 살짝 부드러운 그림자 */
-}
-
-.lecture-box {
-  padding: 10px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.lecture-box:last-child {
-  border-bottom: none;
-}
-
-.lecture-box strong {
-  font-size: 16px;
-  color: #111827; /* 짙은 텍스트 색상 */
-}
-
-.lecture-box p {
-  margin: 5px 0;
-  font-size: 14px;
-  color: #6b7280; /* 회색 텍스트 */
-}
-
-/* 선택된 시간표 */
+/* 시간표 테이블 */
 .selected-timetable {
   margin-top: 30px;
   padding: 20px;
-  background-color: #f3f4f6;
+  background-color: #e0f2fe; /* 부드러운 파란 배경 */
   border: 1px solid #d1d5db;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-radius: 28px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .selected-timetable h2 {
   margin-bottom: 15px;
-  color: #374151;
+  color: #1e3a8a; /* 진한 파란색 */
   font-weight: 700;
   font-size: 20px;
 }
 
-/* 버튼 강조 */
-button.primary {
-  background-color: #10b981; /* 초록색 강조 */
+
+
+.timetable-grid table {
+  width: 100%; /* 테이블 전체 너비 */
+  table-layout: fixed; /* 모든 열의 너비를 동일하게 설정 */
+  border-collapse: collapse; /* 테두리 중복 제거 */
 }
 
-button.primary:hover {
-  background-color: #059669;
+.timetable-grid th,
+.timetable-grid td {
+  border: 1px solid #d1d5db;
+  text-align: center;
+  padding: 15px;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.timetable-grid th {
+  background-color: #2563eb;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.timetable-grid td {
+  background-color: #ffffff;
+  vertical-align: top; /* 셀 안의 내용을 위쪽으로 정렬 */
+  text-align: center; /* 텍스트를 가운데 정렬 */
+  padding: 8px; /* 내부 여백 */
+  white-space: normal; /* 텍스트 줄바꿈 허용 */
+  height: auto; /* 높이를 내용에 맞게 조정 */
+
+}
+
+.lecture-box {
+  background-color: #e0f2fe;
+  margin: 5px auto;
+  padding: 9px;
+  border-radius: 6px;
+  color: #070707;
+  font-size: 14px;
+  text-align: center;
+  white-space: nowrap; /* 줄바꿈 방지 */
+  overflow: hidden; /* 넘치는 텍스트 숨김 */
+  text-overflow: ellipsis; /* 말줄임표 */
+  display: block;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 박스 그림자 */
+}
+
+  
+
+.lecture-box strong {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 4px; /* 강의 제목과 교수명 사이 여백 추가 */
+  white-space: nowrap; /* 제목 줄바꿈 방지 */
+  overflow: hidden; /* 내용 넘침 방지 */
+  text-overflow: ellipsis; /* 말줄임표 추가 */
+}
+
+.lecture-box p {
+  margin: 0;
+  font-size: 12px;
+  color: #4b5563; /* 교수명 회색 텍스트 */
+  white-space: nowrap; /* 줄바꿈 방지 */
+  overflow: hidden; /* 넘치는 텍스트 숨김 */
+  text-overflow: ellipsis; /* 말줄임표 처리 */
 }

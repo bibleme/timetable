@@ -32,7 +32,7 @@ const Modal = ({ isOpen, timetables, onClose, onSelectTimetable }) => {
             <h3>
               {timetables.length === 1 && index === 0
                 ? "최적 시간표"
-                : `시간표 ${index + 1}`}
+              : `시간표 ${index + 1}`}
             </h3>
             {schedule.map((lecture, i) => (
               <div key={i} className="lecture-box">
@@ -66,17 +66,22 @@ function App() {
   const [optimalTimetable, setOptimalTimetable] = useState(null); // 최적 시간표 상태 추가
 
   useEffect(() => {
-    fetch("/data/cleaned_sample.xlsx")
-      .then((response) => response.arrayBuffer())
-      .then((data) => {
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        setLectures(jsonData);
-      })
-      .catch((error) => console.error("Error fetching Excel file:", error));
+    import("./cleaned_sample.xlsx") // src 폴더 내 파일을 가져오기
+      .then((module) => module.default)
+      .then((filePath) => {
+        fetch(filePath)
+          .then((response) => response.arrayBuffer())
+          .then((data) => {
+            const workbook = XLSX.read(data, { type: "array" });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            setLectures(jsonData);
+          })
+          .catch((error) => console.error("Error fetching Excel file:", error));
+      });
   }, []);
+  
 
   const parseTimes = (timesStr) => {
     if (!timesStr) return [];
@@ -155,6 +160,8 @@ function App() {
     backtrack([], new Set(), 0);
     return results;
   };
+
+  
 
   const handleGenerateSchedule = () => {
     const filteredLectures = filterLectures(lectures, selectedSemester);
@@ -300,27 +307,57 @@ function App() {
         onSelectTimetable={handleSelectTimetableFromModal}
       />
 
-      <div className="selected-timetable">
-        <h2>선택된 시간표</h2>
-        {selectedTimetable ? (
-          <div className="timetable">
-            {selectedTimetable.map((lecture, i) => (
-              <div key={i} className="lecture-box">
-                <strong>{lecture.name}</strong>
-                <p>교수: {lecture.professor || "정보 없음"}</p>
-                {lecture.parsedTimes &&
-                  lecture.parsedTimes.map((time, idx) => (
-                    <p key={idx}>
-                      {time.day}요일, {time.period}:00
-                    </p>
-                  ))}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p>선택된 시간표가 없습니다. 시간표 생성 후 선택해주세요.</p>
-        )}
-      </div>
+<div className="selected-timetable">
+  <h2>선택된 시간표</h2>
+  {selectedTimetable && selectedTimetable.length > 0 ? (
+    <div className="timetable-grid">
+      <table>
+        <thead>
+          <tr>
+            <th>시간</th>
+            <th>월요일</th>
+            <th>화요일</th>
+            <th>수요일</th>
+            <th>목요일</th>
+            <th>금요일</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[...Array(12)].map((_, hourIndex) => {
+            const hour = 9 + hourIndex; // 9시부터 시작
+            return (
+              <tr key={hour}>
+                <td>{hour}:00</td>
+                {["월", "화", "수", "목", "금"].map((day) => (
+                  <td key={day}>
+                    {selectedTimetable
+                      .filter((lecture) =>
+                        lecture.parsedTimes.some(
+                          (time) =>
+                            time.day === day && parseInt(time.period) === hour
+                        )
+                      )
+                      .map((lecture, idx) => (
+                        <div key={idx} className="lecture-box">
+                          <strong>{lecture.name}</strong>
+                          <p>{lecture.professor || "정보 없음"}</p>
+                        </div>
+                      ))}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  ) : (
+    <p>선택된 시간표가 없습니다. 시간표 생성 후 선택해주세요.</p>
+  )}
+</div>
+
+
+
     </div>
   );
 }
