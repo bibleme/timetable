@@ -62,7 +62,7 @@ src
   
   다양한 기준(mostFreeDays, specificProfessor, balancedDistribution)에 따라 최적 시간표를 계산합니다.
 
-## 🛡️License
+## 🛡️라이센스
 This project is licensed under the MIT License.
 
 
