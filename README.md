@@ -1,70 +1,64 @@
-# Getting Started with Create React App
+# SchedulEase
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+[**SchedulEase**](https://bibleme.github.io/)는 대학생들을 위한 시간표 생성 웹사이트입니다.<br>
+사용자가 학기를 선택하면 조건에 맞는 시간표를 생성할 수 있으며, 특정 기준에 따라 시간표를 최적화할 수도 있습니다.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## 📋 주요 기능
 
-### `npm start`
+- **시간표 생성**: 사용자가 선택한 학기에 기반한 가능한 시간표 조합 생성
+- **최적 시간표 추천**:
+  - 공강이 가장 많은 시간표.
+  - 특정 교수를 포함한 시간표.
+  - 수업 시간이 고르게 분배된 시간표.
+- **시간표 선택 및 확인**: 생성된 시간표 중 하나를 선택하고, 보기 편하게 정리된 형태로 확인 가능.
+- **Excel 파일 데이터 처리**: 강의 데이터를 Excel 파일에서 로드하여 사용.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 🛠 사용된 라이브러리
 
-### `npm test`
+- **React**: 사용자 인터페이스를 위한 라이브러리
+- **XLSX**: Excel 파일 처리 라이브러리
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-### `npm run build`
+## 📂 프로젝트 구조
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```
+src
+├── App.js               # 메인 컴포넌트
+├── App.css              # 스타일 파일
+├── cleaned_sample.xlsx  # 시간표 데이터 Excel 파일
+└── index.js             # 엔트리 파일
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 📖 사용 방법
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. 학기 선택
+화면 상단의 드롭다운 메뉴에서 학기를 선택하세요.
 
-### `npm run eject`
+2. 시간표 생성
+시간표 생성 버튼을 눌러 선택한 학기에 기반한 가능한 시간표 조합을 생성합니다.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+3. 최적 시간표 보기
+조건에 따라 최적 시간표 보기 버튼을 눌러 최적화된 시간표를 확인하세요.
+- 공강이 많은 시간표
+- 특정 교수를 포함한 시간표
+- 수업 시간이 균형 있게 분배된 시간표
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+4. 시간표 선택
+생성된 시간표 목록에서 원하는 시간표를 선택하세요. 선택된 시간표는 별도의 섹션에서 확인할 수 있습니다.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 💡 주요 로직
+시간표 충돌 체크
+hasConflict 함수로 강의 시간 간 충돌 여부를 확인합니다.
+시간표 생성
+백트래킹(Backtracking) 알고리즘을 활용하여 가능한 모든 유효한 시간표 조합을 생성합니다.
+최적 시간표 계산
+다양한 기준(mostFreeDays, specificProfessor, balancedDistribution)에 따라 최적 시간표를 계산합니다.
 
-## Learn More
+## License
+This project is licensed under the MIT License.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
