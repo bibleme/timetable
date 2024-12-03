@@ -266,25 +266,32 @@ const generateValidTimetables = (lectures) => {
           optimal = filteredTimetables[0];
           break;
 
-      case "balancedDistribution":
-        // 고르게 분포된 시간표 찾기
-        optimal = allTimetables.reduce((best, current) => {
-          const calculateDistribution = (schedule) => {
-            const hoursPerDay = {};
-            schedule.forEach((lecture) =>
-              lecture.parsedTimes.forEach((time) => {
-                hoursPerDay[time.day] = (hoursPerDay[time.day] || 0) + 1;
-              })
-            );
-            const values = Object.values(hoursPerDay);
-            return Math.max(...values) - Math.min(...values); // 분포 균형도 계산
-          };
+case "balancedDistribution":
+  optimal = allTimetables.reduce((best, current) => {
+    // 시간표의 요일별 강의 시간 분포를 계산하는 함수
+    const calculateDistribution = (schedule) => {
+      const hoursPerDay = {}; // 요일별 강의 시간을 저장할 객체 초기화
+      schedule.forEach((lecture) =>
+        lecture.parsedTimes.forEach((time) => {
+          // 시간 정보에서 강의가 진행되는 요일(time.day)에 해당하는 시간(hoursPerDay)에 카운트 추가
+          // time.day가 기존에 없으면 0으로 초기화 후 1을 더함
+          hoursPerDay[time.day] = (hoursPerDay[time.day] || 0) + 1;
+        })
+      );
 
-          return calculateDistribution(current) < calculateDistribution(best)
-            ? current
-            : best;
-        });
-        break;
+      const values = Object.values(hoursPerDay); // 각 요일별 강의 시간 카운트를 배열로 변환
+      // 고른 배분 계산: 강의 시간이 가장 많은 요일과 가장 적은 요일의 차이 반환
+      return Math.max(...values) - Math.min(...values);
+    };
+
+    // 현재 시간표(current)와 최적 시간표(best) 중 더 고르게 분포된 시간표를 선택
+    // calculateDistribution 함수로 요일별 강의 분포 차이를 계산하여 비교
+    // 차이가 더 작은 시간표(current)가 더 고르게 분포된 경우 최적 시간표(best)로 설정
+    return calculateDistribution(current) < calculateDistribution(best)
+      ? current // current가 더 균형 잡힌 경우 선택
+      : best; // 그렇지 않으면 기존 best 유지
+  });
+  break; // balancedDistribution 기준 처리 종료
 
       default:
         alert("유효한 기준을 선택하세요.");
