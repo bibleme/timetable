@@ -213,22 +213,26 @@ const generateValidTimetables = (lectures) => {
     let optimal; // 최적 시간표 변수
 
     switch (selectedCriteria) {
-      case "mostFreeDays":
+     case "mostFreeDays":
         // 공강이 많은 시간표 찾기
         optimal = allTimetables.reduce((best, current) => {
+          // 특정 시간표(schedule)의 공강일 수를 계산하는 함수
           const calculateFreeDays = (schedule) => {
-            const days = new Set();
+            const days = new Set(); // 강의가 있는 요일을 저장할 Set(중복 제거를 위해 사용)
+            // 주어진 시간표(schedule)에 포함된 모든 강의를 순회
             schedule.forEach((lecture) =>
-              lecture.parsedTimes.forEach((time) => days.add(time.day))
+              lecture.parsedTimes.forEach((time) => days.add(time.day)) // 강의가 있는 요일(time.day)을 Set에 추가
             );
+            // 주중 요일 수(5, 월~금)에서 강의가 있는 요일 수를 빼서 공강일 수 계산
             return 5 - days.size; // 공강일 수 계산
           };
-
+          // 현재 시간표(current)와 현재까지 최적 시간표(best)를 비교
+          // 공강일 수가 더 많은 시간표를 선택하여 반환
           return calculateFreeDays(current) > calculateFreeDays(best)
-            ? current
-            : best;
+            ? current // 현재 시간표(current)의 공강일 수가 더 많으면 이를 최적 시간표로 선택
+            : best; // 그렇지 않으면 기존 최적 시간표(best)를 유지
         });
-        break;
+        break; // 종료
 
       case "specificProfessor":
           // 사용자가 선호하는 교수님 이름을 입력받음
