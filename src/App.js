@@ -123,57 +123,70 @@ function App() {
       });
   };
 
-  // 시간표 충돌 여부를 확인하는 함수
-  const hasConflict = (existingSchedule, newLecture) => {
-    return newLecture.parsedTimes.some((newTime) =>
-      existingSchedule.some((scheduled) =>
-        scheduled.parsedTimes.some(
-          (scheduledTime) =>
-            scheduledTime.day === newTime.day &&
-            scheduledTime.period === newTime.period
-        )
+  // 강의 간 시간 충돌 여부를 확인하는 함수
+const hasConflict = (existingSchedule, newLecture) => {
+  // 새로 추가할 강의(newLecture)의 시간 중 하나라도
+  // 기존 스케줄(existingSchedule)에 포함된 강의의 시간과
+  // 요일(day)과 시간(period)이 겹치는지 확인
+  return newLecture.parsedTimes.some((newTime) =>
+    existingSchedule.some((scheduled) =>
+      scheduled.parsedTimes.some(
+        (scheduledTime) =>
+          scheduledTime.day === newTime.day && // 요일이 같고
+          scheduledTime.period === newTime.period // 시간이 같으면 true 반환
       )
-    );
-  };
+    )
+  );
+};
 
-  // 가능한 모든 시간표를 생성하는 함수 (백트래킹 사용)
-  const generateValidTimetables = (lectures) => {
-    const results = []; // 결과 저장 배열
+// 가능한 모든 유효한 시간표를 생성하는 함수
+const generateValidTimetables = (lectures) => {
+  const results = []; // 결과로 반환할 모든 가능한 시간표 배열
 
-    // 백트래킹 함수
-    const backtrack = (currentSchedule, includedNames, index) => {
-      if (index === lectures.length) {
-        // 강의를 모두 탐색한 경우
-        if (
-          includedNames.size ===
-          new Set(lectures.map((lecture) => lecture.name)).size
-        ) {
-          results.push([...currentSchedule]); // 유효한 시간표 저장
-        }
-        return;
-      }
+  // 백트래킹(재귀) 함수 정의
+  /* 핵심 개념
+  * currentSchedule : 현재까지 만든 시간표 (시간 충돌, 중복 없음)
+  * includeNames : 현재 시간표에 포함된 강의 이름의 집합
+  * index : 탐색 중인 강의의 인덱스, lectures 배열에서 몇 번째 강의를 처리 중인지 나타냄
+  * results : 가능한 모든 유효한 시간표를 저장하는 배열
+  */
+  const backtrack = (currentSchedule, includedNames, index) => {
 
-      const lecture = lectures[index];
-
-      // 현재 강의를 포함해도 되는 경우
+    // 종료 조건: 모든 강의를 탐색한 경우
+    if (index === lectures.length) {
+      // 포함된 강의 이름의 수가 전체 고유 강의 이름 수와 같으면
+      // (즉, 중복 없이 모든 강의가 포함된 경우)
       if (
-        !includedNames.has(lecture.name) &&
-        !hasConflict(currentSchedule, lecture)
+        includedNames.size ===
+        new Set(lectures.map((lecture) => lecture.name)).size
       ) {
-        backtrack(
-          [...currentSchedule, lecture],
-          new Set([...includedNames, lecture.name]),
-          index + 1
-        );
+        results.push([...currentSchedule]); // 현재 시간표를 결과에 추가
       }
+      return; // 함수 종료
+    }
 
-      // 현재 강의를 포함하지 않는 경우
-      backtrack(currentSchedule, includedNames, index + 1);
-    };
+    const lecture = lectures[index]; // 현재 강의 가져오기
 
-    backtrack([], new Set(), 0); // 초기 호출
-    return results;
+    // 현재 강의를 시간표에 추가할 수 있는 경우
+    if (
+      !includedNames.has(lecture.name) && // 강의 이름이 중복되지 않고
+      !hasConflict(currentSchedule, lecture) // 시간 충돌이 없을 때
+    ) {
+      // 현재 강의를 추가하고 다음 강의로 이동
+      backtrack(
+        [...currentSchedule, lecture], // 현재 스케줄에 강의 추가
+        new Set([...includedNames, lecture.name]), // 포함된 강의 이름 추가
+        index + 1 // 다음 강의로 이동
+      );
+    }
+
+    // 현재 강의를 추가하지 않고 다음 강의로 이동
+    backtrack(currentSchedule, includedNames, index + 1);
   };
+
+  backtrack([], new Set(), 0); // 백트래킹 시작: 빈 스케줄, 빈 이름 집합, 첫 번째 강의
+  return results; // 생성된 모든 유효한 시간표 반환
+};
 
   // 시간표 생성 버튼 클릭 시 호출
   const handleGenerateSchedule = () => {
@@ -218,32 +231,40 @@ function App() {
         break;
 
       case "specificProfessor":
-        // 특정 교수 포함 시간표 찾기
-        const preferredProfessor = prompt("선호하는 교수님의 성함을 입력하세요:");
-        if (!preferredProfessor) {
-          alert("교수님의 성함을 입력해주세요.");
-          return;
-        }
-
-        const filteredTimetables = allTimetables.filter((timetable) =>
-          timetable.some(
-            (lecture) =>
-              lecture.professor &&
-              lecture.professor
-                .toLowerCase()
-                .includes(preferredProfessor.toLowerCase().trim())
-          )
-        );
-
-        if (!filteredTimetables.length) {
-          alert(
-            `${preferredProfessor} 교수님이 포함된 시간표를 찾을 수 없습니다.`
+          // 사용자가 선호하는 교수님 이름을 입력받음
+          const preferredProfessor = prompt("선호하는 교수님의 성함을 입력하세요:");
+        
+          // 사용자가 아무 입력도 하지 않은 경우 경고를 표시하고 함수 종료
+          if (!preferredProfessor) {
+            alert("교수님의 성함을 입력해주세요.");
+            return; // 입력이 없으면 더 이상 진행하지 않음
+          }
+        
+          // 모든 시간표(allTimetables)에서 특정 교수님이 포함된 시간표를 필터링
+          const filteredTimetables = allTimetables.filter((timetable) =>
+            timetable.some(
+              (lecture) =>
+                lecture.professor && // 강의 정보에 교수님 이름이 존재하고
+                lecture.professor
+                  .toLowerCase() // 교수님 이름을 소문자로 변환하여
+                  .includes(preferredProfessor.toLowerCase().trim()) // 사용자가 입력한 이름과 일치 여부 확인 (대소문자 무시, 공백 제거)
+            )
           );
-          return;
-        }
-
-        optimal = filteredTimetables[0]; // 조건을 만족하는 첫 번째 시간표 선택
-        break;
+        
+          // 특정 교수님이 포함된 시간표가 없는 경우 사용자에게 알림
+          if (!filteredTimetables.length) {
+            // 배열의 길이를 확인하여 배열이 비어있는지 검사
+            // filteredTimetables.length가 0이라면, 만족하는 시간표 없다는 뜻이므로
+            // !filteredTimetables.length가 true가 되어 alert 실행
+            alert(
+              `${preferredProfessor} 교수님이 포함된 시간표를 찾을 수 없습니다.`
+            );
+            return; // 필터링된 시간표가 없으면 더 이상 진행하지 않음
+          }
+        
+          // 필터링된 시간표 중 첫 번째 시간표를 최적 시간표로 선택
+          optimal = filteredTimetables[0];
+          break;
 
       case "balancedDistribution":
         // 고르게 분포된 시간표 찾기
